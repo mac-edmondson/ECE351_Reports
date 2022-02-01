@@ -1,0 +1,11 @@
+\babel@toc {english}{}
+\contentsline {section}{\numberline {1}Introduction}{2}{section.0.1}%
+\contentsline {section}{\numberline {2}Equations}{2}{section.0.2}%
+\contentsline {section}{\numberline {3}Methodology}{2}{section.0.3}%
+\contentsline {subsection}{\numberline {3.1}Lab: Part 1}{2}{subsection.0.3.1}%
+\contentsline {subsection}{\numberline {3.2}Lab: Part 2}{3}{subsection.0.3.2}%
+\contentsline {subsection}{\numberline {3.3}Lab: Part 3}{4}{subsection.0.3.3}%
+\contentsline {section}{\numberline {4}Results}{5}{section.0.4}%
+\contentsline {section}{\numberline {5}Error Analysis}{10}{section.0.5}%
+\contentsline {section}{\numberline {6}Questions}{10}{section.0.6}%
+\contentsline {section}{\numberline {7}Conclusion}{10}{section.0.7}%
