@@ -159,134 +159,282 @@ Series RLC Bandpass Circuit Equations:
     \omega_0 = \sqrt{\frac{1}{LC}}
   \end{aligned}
 \end{equation}
-\begin{equation}\label{eq: cen_freq} %Full Fourier Series
+\begin{equation}\label{eq: cor_freq} %Full Fourier Series
   \begin{aligned}[c]
     \omega_{c1/c2} = \mp \frac{R}{2L} + \sqrt{(\frac{R}{2L})^2 + (\frac{1}{LC})}
   \end{aligned}
 \end{equation}
 
 
-\section{Methodology}
-
-This lab started out by calculating the transfer function of the given difference equation (Equation \eqref{eq: cf}). The
-Z-domain transfer function, H(z), was first found followed by h[k], which can be seen in Equations \eqref{eq: hz} \& \eqref{eq: hz}.
-Work to find these functions can be seen in the \nameref{section: Attachments} section of this report. The partial fraction expansion
-used to find h[k] was verified using the \texttt{scipy.singal.residuez()} function (output seen in Figure \ref{fig: t3}). 
-
-Next, a pole-zero plot of H(z) was generated using the provided \texttt{zplane()} function written by Christopher Felton.
-The plot can be seen in Figure \ref{fig: t4} and it is able to tell us a lot about the system. Further discussion in 
-the \nameref{section: Questions} section of this report.
-
-Lastly, a magnitude and phase frequency response plot was generated for H(z) using the \texttt{scipy.signal.freqz()} function.
-Included in this report are two plots of this frequency response Figure \ref{fig: t5ns} with a base 10 scale and Figure \ref{fig: t5ls}
-with a logarithmic scale. These plots were plotted using the Normalized Nyquist Frequency making the x-axis units $\pi$ radians per sample.
-This frequency is commonly used when analyzing discrete-time functions and Fourier Transforms to analyze the stability of a system.
-
-Code implementing Part 1 of this lab can be seen in the below listing.
+\section{Methodology}\label{section: Methodology}
+The first task accomplished in this lab was importing and viewing the signal given in a CSV. A Fast Fourier Transform was also
+performed to view the magnitude of noise components at different frequencies. The code to perform this task is given in the below
+listing.
 
 \begin{lstlisting}[language=Python, basicstyle=\footnotesize]
-## PART 1 ##
-# 3
-num = [2, -40]
-den = [1, -10, 16]
-r, p, k = spsig.residuez(num, den)
-print("Partial Fraction Results")
-print("Residues: " + str(r))
-print("Poles: " + str(p))
-print("Coefficents: " + str(k))
+# Get data from CSV into arrays
+df = pd.read_csv('NoisySignal.csv')
 
-# 4
-zplane.zplane(num, den)
+t = df['0'].values
+sensor_sig = df['1'] .values
 
-#5
-w, h = spsig.freqz(num, den, whole=True)
+step_size = t[1] - t[0]; # Get time step of input signal
+print("Step Size is: " + str(step_size))
+freq_sample = 1/step_size
 
-plt.figure(figsize = (10, 11))
+# Perfom FFT (Imported from Lab9)
+def myFFT(x, fs, clean=False):
+    N = len(x)
+    X_fft = spfft.fft(x)
+    X_fft_shifted = spfft.fftshift(X_fft)
+    
+    freq = np.arange(-N/2, N/2)*fs/N
+    X_mag = np.abs(X_fft_shifted)/N
+    X_phi = np.angle(X_fft_shifted)
+    if(clean):
+        for i in range(0, len(X_phi)):
+            if (X_mag[i] < (1e-10)) :
+                X_phi[i] = 0
+        
+    return freq, X_mag, X_phi
+
+freq, X_mag, X_phi = myFFT(sensor_sig, freq_sample, clean=False)
+
+plt.figure(figsize = (15, 17))
+plt.subplot(3, 1, 1)
+plt.plot(t, sensor_sig, "b-")
+plt.grid()
+plt.ylabel('x(t)')
+plt.xlabel('t')
+plt.title('FFT of Input Signal, x(t)')
+plt.subplot(3, 2, 3)
+plt.stem(freq, X_mag, "b-")
+plt.grid()
+plt.ylabel('|X(f)|')
+plt.subplot(3, 2, 4)
+plt.stem(freq, X_mag, "b-")
+plt.xlim(0, 100e3)
+
+plt.grid()
+plt.subplot(3, 2, 5)
+plt.stem(freq, X_phi, "b-")
+plt.grid()
+plt.ylabel('/_X(f)')
+plt.xlabel('f [Hz]')
+plt.subplot(3, 2, 6)
+plt.grid()
+plt.stem(freq, X_phi, "b-")
+plt.xlim(0, 100e3)
+
+plt.figure(figsize = (15,17))
+plt.subplot(1, 1, 1)
+plt.stem(freq, X_mag, "b-")
+plt.xticks(np.arange(0, 3e3 + 100, 100))
+plt.xlim(0, 3e3)
+plt.title("Unfiltered Signal Magnitudes [0 to 3k Hz]")
+plt.grid()
+plt.ylabel('Mag.')
+plt.xlabel('f [Hz]')
+\end{lstlisting}
+
+This code yielded the graphs shown in Figures \ref{fig: NISFFT} \& \ref{fig: UISM}.
+
+Next, I began designing a filter to isolate the wanted frequency band of $1.8\: kHz \leq f \leq 2\: kHz$. As there is 
+noise on both sides of the needed frequency band, this implies a bandpass filter must be designed. Scratch work
+for this filter design can be seen in the \nameref{section: Attachments} section of this report. I started with the 
+center and corner frequency equations (seen in Equations \eqref{eq: cen_freq} \& \eqref{eq: cor_freq}), and chose a center
+frequency of $1.9\: kHz$. I then solved for L in terms of C based on Equation \eqref{eq: cen_freq} and selected a value
+for L and C that fit the equation and seemed realistic. I then computationally solved for the resistor value for both 
+corner frequencies (Equation \eqref{eq: cor_freq}), averaged them, and used that as my initial resistor value. 
+
+Once some values were decided upon, I created a Bode plot to verify my results. I found that I could greatly reduce
+my resistor value and eventually came up with the filter seen in Figure \ref{fig: Filter}. Multiple Bode plots of the 
+filter's frequency response are seen in Figures \ref{fig: FRFB}, \ref{fig: IRFB}, \& \ref{fig: MPFB}. Each bode plot
+shows different frequency ranges of the filter and that the filter meets the specifications given for the lab. Code 
+for generating the plots is seen in the following listing.
+
+\begin{lstlisting}[language=Python, basicstyle=\footnotesize]
+C = 3.5 * 1e-6
+L = 2.01 * 1e-3
+R = 9.4
+
+num = [(R/L), 0]
+den = [1, (R/L), (1/(L*C))]
+
+sys = con.TransferFunction(num, den)
+syssig = spsig.lti(num, den)
+
+step_size = 1e2
+w = np.arange(1, (1e6 * 2*np.pi)+step_size, step_size)
+bodeW, bodeMag, bodePhase = spsig.bode(syssig, w)
+
+plt.figure(figsize=(11, 15))
 plt.subplot(2, 1, 1)
-plt.plot(w/np.pi, 20*np.log10(abs(h)), "b-")
+plt.semilogx(bodeW/(2*np.pi), bodeMag)
 plt.grid(True, which='both', ls='-')
-plt.ylabel('Magnitude [dB]')
-plt.title('Magnitude and Phase of H(z)')
-plt.subplot(2, 1, 2)
-plt.grid(True, which='both', ls='-')
-plt.plot(w/np.pi, np.angle(h, deg=True), "b-")
-plt.ylabel('angle(H(S)) [deg]')
-plt.xlabel('Frequency [pi/sample]')
+plt.ylabel('Magnitude (dB)')
+plt.yticks(np.arange(-90, 10, 10))
+plt.title('Magnitude and Phase Bode Plot [spsig.bode]')
+plt.xlabel('freq (rad/s)')
+plt.show()
 
-plt.figure(figsize = (10, 11))
+plt.figure(figsize=(10, 11))
+plt.ylim(0, 10)
+_ = con.bode(sys, omega=None, dB = True, Hz = True, deg = True, Plot = True)
+plt.xlim(1.8e3, 2e3)
 plt.subplot(2, 1, 1)
-plt.semilogx(w/2/np.pi, 20*np.log10(abs(h)), "b-")
-plt.grid(True, which='both', ls='-')
-plt.ylabel('Magnitude [dB]')
-plt.title('Magnitude and Phase of H(z)')
-plt.subplot(2, 1, 2)
-plt.grid(True, which='both', ls='-')
-plt.semilogx(w/2/np.pi, np.angle(h, deg=True), "b-")
-plt.ylabel('angle(H(S)) [deg]')
-plt.xlabel('Frequency [pi/sample]')
+plt.ylim(-.5, 0)
+plt.title('Magnitude and Phase Bode Plot [con.bode] (Hz)')
+plt.show()
+
+plt.figure(figsize=(10, 11))
+_ = con.bode(sys, omega=None, dB = True, Hz = True, deg = True, Plot = True)
+plt.xlim(0, 1e6)
+plt.subplot(2, 1, 1)
+plt.title('Magnitude and Phase Bode Plot [con.bode] (Hz)')
+plt.show()
+\end{lstlisting}
+
+Lastly, I filtered the Noisy input signal using the filter designed. A FFT was also performed to verify the filter was
+properly attenuating all unwanted noise to an appropriate magnitude. The code implementing this filtering process is
+shown in the below listing. The output of this code can be seen in Figures \ref{fig: FISFFT} \& \ref{fig: FISM}.
+
+\begin{lstlisting}[language=Python, basicstyle=\footnotesize]
+step_size = t[1] - t[0];
+fs = 1/step_size
+
+z, p= spsig.bilinear(num, den, fs=fs)
+filtered_sig = spsig.lfilter(z, p, sensor_sig)
+
+freq, X_mag, X_phi = myFFT(filtered_sig, freq_sample, clean=False)
+
+plt.figure(figsize = (15, 17))
+plt.subplot(3, 1, 1)
+plt.plot(t, filtered_sig, "b-")
+plt.grid()
+plt.ylabel('x(t)')
+plt.xlabel('t')
+plt.title('FFT of Input Signal, x(t)')
+plt.subplot(3, 2, 3)
+plt.stem(freq, X_mag, "b-")
+plt.grid()
+plt.ylabel('|X(f)|')
+plt.subplot(3, 2, 4)
+plt.stem(freq, X_mag, "b-")
+plt.xlim(0, 100e3)
+
+plt.grid()
+plt.subplot(3, 2, 5)
+plt.stem(freq, X_phi, "b-")
+plt.grid()
+plt.ylabel('/_X(f)')
+plt.xlabel('f [Hz]')
+plt.subplot(3, 2, 6)
+plt.stem(freq, X_phi, "b-")
+plt.xlim(0, 100e3)
+
+plt.grid()
+plt.xlabel('f [Hz]')
+
+plt.figure(figsize = (15,17))
+plt.subplot(1, 1, 1)
+plt.stem(freq, X_mag, "b-")
+# plt.grid(True, which='both', ls='-')
+plt.xticks(np.arange(0, 3e3 + 100, 100))
+plt.xlim(0, 3e3)
+plt.title("Filtered Signal Magnitudes [0 to 3k Hz]")
+plt.grid()
+plt.ylabel('Mag.')
+plt.xlabel('f [Hz]')
 \end{lstlisting}
 
 \section{Results}\label{section: Results}
 The results of this lab are very straightforward. The implementation of all functions worked as expected and the results are as expected.
-More analysis of theory and results is discussed in the \nameref{section: Questions} section of this report.
+More analysis of theory and results is discussed in the \nameref{section: Methodology} section of this report.
 
-The deliverables for Part 1 of this lab are seen in all figures given below.
+The deliverables of this lab are seen in all figures given below.
+
+Looking at the unfiltered data (Figures \ref{fig: NISFFT} \& \ref{fig: UISM}), it can be seen there is significant noise below 100 Hz and above 3000 Hz. 
+When comparing that to the data after it was run through the filter (Figures \ref{fig: FISFFT} \& \ref{fig: FISM}), all noise was attenuated to the 
+point it is almost unnoticeable in the magnitude plots. Additionally, it can be seen that the magnitudes of the frequencies in the range 
+$1.8\: kHz \leq f \leq 2.0\: kHz$ are attenuated by no less than -0.3 dB (Figure \ref{fig: IRFB}). All of this makes a very nice nice looking 
+output signal seen in Figure \ref{fig: FISFFT} which could then be processed further to extract data.
 \\
 \begin{figure}[h!]
   \centering
-  \includegraphics[width=\linewidth]{t3.PNG}
-  \caption{Verification of PFE using \texttt{scipy.signal.residuez()}}
-  \label{fig: t3}
+  \includegraphics[width=\linewidth]{NISFFT.png}
+  \caption{Noisy Input Signal + FFT}
+  \label{fig: NISFFT}
 \end{figure}
 \begin{figure}[h!]
   \centering
-  \includegraphics[width=\linewidth]{t4.png}
-  \caption{H(z) Pole-Zero Plot using \texttt{zplane()}}
-  \label{fig: t4}
+  \includegraphics[width=\linewidth]{UISM.png}
+  \caption{Noisy Input Signal Magnitudes (Reduced Freq. Range)}
+  \label{fig: UISM}
 \end{figure}
 \begin{figure}[h!]
   \centering
-  \includegraphics[width=\linewidth]{t5ns.png}
-  \caption{Magnitude and Phase Response of H(z) [Base 10 Scale]}
-  \label{fig: t5ns}
+  \includegraphics[scale=1]{Filter.png}
+  \caption{Filter Design}
+  \label{fig: Filter}
 \end{figure}
 \begin{figure}[h!]
   \centering
-  \includegraphics[width=\linewidth]{t5ls.png}
-  \caption{Magnitude and Phase Response of H(z) [Logarithmic Scale]}
-  \label{fig: t5ls}
+  \includegraphics[width=\linewidth]{FRFB.png}
+  \caption{Filter Full Range Magnitude Bode Plot}
+  \label{fig: FRFB}
 \end{figure}
-
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=\linewidth]{MPFB.png}
+  \caption{Filter Partial Range Magnitude + Phase Bode Plot}
+  \label{fig: MPFB}
+\end{figure}
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=\linewidth]{IRFB.png}
+  \caption{Filter Input Range Magnitude + Phase Bode Plot}
+  \label{fig: IRFB}
+\end{figure}
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=\linewidth]{FISFFT.png}
+  \caption{Filtered Input Signal + FFT}
+  \label{fig: FISFFT}
+\end{figure}
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=\linewidth]{FISM.png}
+  \caption{Filtered Input Signal Magnitudes (Reduced Freq. Range)}
+  \label{fig: FISM}
+\end{figure}
 
 \section{Error Analysis}\label{section: ErAn}
-No sources of error were seen throughout this lab. Verifying the PFE expansion performed by hand using the \texttt{scipy.signal.residuez()} function
-actually removed, or at least reduced, a possible source of error.
+No sources of error were seen throughout this lab.
 
 \section{Questions}\label{section: Questions}
 \begin{enumerate}
-  \item Looking at the plot generated in Task 4, is H(z) stable? Explain why or why not.
+  \item Earlier this semester, you were asked what you personally wanted to get out of taking this
+  course. Do you feel like that personal goal was met? Why or why not?
   \begin{itemize}
-    \item As seen in the plot generated in Task 4, Figure \ref{fig: t4}, all poles are in the right half plane. As is known, as z approaches those poles accumulation
-    of energy will not end and causes instability. Thus, H(z) is unstable.
-  \end{itemize}
-  \item Leave any feedback on the clarity of lab tasks, expectations, and deliverables.
-  \begin{itemize}
-    \item This lab was very clear for all instructions, expectations and deliverables.
+    \item I feel strongly that the personal goal I set at the beginning of this semester was met. I have built my skills in using Python
+    to perform post-processing on signals and general mathematics, etc. I have used Python as an aid to verify results of homework questions 
+    throughout this course which has been very useful and I think it shows how my goal has been accomplished. 
   \end{itemize}
 \end{enumerate}
 \section{Conclusion}
-In conclusion, I feel this lab was very successful. After learning the z-transform content of this course, I almost feel it would have
-been more useful to know this content first as many concepts seen throughout previous labs seem to rely heavily on these concepts.
+In conclusion, I feel this lab was very successful. I feel this lab was a great conglomeration of many concepts
+taught throughout the course and it was fun to solve a problem on my own with little hand holding from the lab handout.
 All in all, I am very satisfied with what this lab has taught me and feel it was an excellent use of time.
 \newpage
 \thispagestyle{customblank}
 \section{Attachments}\label{section: Attachments}
 \centering\begin{enumerate}
-  \item H(z) Hand Calculations
+  \item Filter design scratch-work
 \end{enumerate}
 \vspace*{\fill}
 
-\includepdf[pages=2, offset=1in -1in]{./attachments/lab11.pdf}
+\includepdf[pages=1, offset=1in -1in]{./attachments/lab12.pdf}
 % \includepdf[pages=3, offset=1in -1in]{./attachments/lab5.pdf}
 
 % \begin{thebibliography}{111} 
